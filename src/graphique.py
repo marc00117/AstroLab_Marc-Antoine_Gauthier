@@ -305,6 +305,7 @@ class BarreControle(ctk.CTkFrame):
         # CTkEntry (case où l'on écrit) : https://customtkinter.tomschimansky.com/documentation/widgets/entry
         self.pas_temps = ctk.CTkEntry(self, width=60)
         self.pas_temps.insert(0, "5")  # texte de départ
+        self.pas_temps.bind("<FocusIn>", self.__commande_pause)
 
         # Défilement du temps
         self.defil = False
@@ -335,14 +336,16 @@ class BarreControle(ctk.CTkFrame):
     def t(self, value):
         self.__t = max(0, min(value, int(self.master.simulateur.temps_max())))  # Garder t entre 0 et temps_max
         self.afficher_temps(self.__t)
+        self.master.simulateur.calculer(value)
         self.master.vue.dessiner(*self.master.simulateur.astres_et_projectiles, self.t)
 
     # Commandes des boutons
     def __commande_reinitialiser(self):
         """Réinitialise le temps et force le graphique à se recalculer."""
-        self.master.simulateur.recalculer()
-        self.master.afficher(avec_cache=True)
         self.__commande_arreter()
+        self.master.simulateur.calculer(self.t)
+        self.master.afficher(avec_cache=True)
+        
 
     def __commande_arreter(self):
         """Arrête le défilement du temps et revient à t=0."""
@@ -358,7 +361,7 @@ class BarreControle(ctk.CTkFrame):
         else:
             self.__commande_pause()
 
-    def __commande_pause(self):
+    def __commande_pause(self, evenement = None): # evenement permet d'etre utiliser avec pas_temps
         """Met sur pause le défilement du temps."""
         self.defil = False
         self.boutons["jouer"].configure(text="▶ Jouer", command=self.__commande_lecture)
@@ -372,10 +375,23 @@ class BarreControle(ctk.CTkFrame):
         self.t -= int(self.pas_temps.get())
 
     def mise_a_jour_lecture(self):
-        """Met à jour le temps à chaque 0.1 seconde"""
+        """Met à jour le temps à chaque 0.01 seconde"""
+        
+        #if self.pas_temps._is_focused: # si l'on change le temps en emem temps que sa joue
+        #    self.__commande_pause()
+        
+        print("1- ", self.focus_get(),"    2- ",  self.boutons["jouer"].focus_get()," rep = ", self.focus_get() != self.boutons["jouer"].focus_get())
+        
+        
+        
+        if not str(self.focus_get()).startswith(str(self.boutons["jouer"])): ### mheeee je oense pas que ca je vais aimer ca:( 
+            self.__commande_pause()
+        
         if self.defil and self.t < self.master.simulateur.temps_max():
-            self.after(100, self.mise_a_jour_lecture)  # programmé avant de dessiner : l'attente et le dessin se chevauchent
-            self.t += int(self.pas_temps.get())
+            if self.pas_temps.get() != '':
+                self.t += int(self.pas_temps.get())
+            self.after(10, self.mise_a_jour_lecture)  # programmé avant de dessiner : l'attente et le dessin se chevauchent
+            
         else:
             self.__commande_pause()
 
@@ -507,7 +523,8 @@ class FenetreSimulateur(ctk.CTk):
         :param chemin: Chemin du fichier CSV
         """
         self.simulateur.importer(chemin)
-        self.simulateur.recalculer()
+        self.simulateur.calculer(self.barre_controle.t)
+        
         # os.path.basename garde seulement le nom du fichier : https://docs.python.org/3/library/os.path.html
         self.afficher(*self.simulateur.astres_et_projectiles, os.path.basename(chemin))
         self.barre_controle.t = 0
@@ -556,7 +573,7 @@ class FenetreSimulateur(ctk.CTk):
         except ValueError as erreur:  # masse ou rayon négatifs
             return str(erreur)
         self.simulateur.projectiles.append(projectile)
-        self.simulateur.recalculer()
+        self.simulateur.calculer(self.barre_controle.t)
         self.afficher(*self.simulateur.astres_et_projectiles, self.cache["nom_fichier"], self.barre_controle.t)
         return None
 

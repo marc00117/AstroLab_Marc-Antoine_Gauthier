@@ -24,10 +24,13 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], p
         HorsSystemeError: _si le projectile est hors du système._
         TempsMaximumAtteinte: _si le nombre de temps maximum a été atteint._
 
-    Returns:historique
+    Returns:
         AstreFixe: _retourne l'astre fixe seulement s'il a eu contacte avec un astre fixe_
     """
-
+    historique = projectile.historique
+    if len(historique) > prochain_t: # verifi si la trajectoire au temps prochain_t est deja calculee 
+        return 
+    
     # Vérifi si toutes les valeurs données sont correct
     if not isinstance(projectile, Projectile):
         raise ValueError("Physique : p doit etre un Projectile.")
@@ -45,7 +48,7 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], p
     historique = projectile.historique
     
     if len(historique) > prochain_t: # verifi si la trajectoire au temps prochain_t est deja calculee 
-        return
+        return 
 
     Nb_iterations_enregistrement = int(1 / dt) # calcule qui determine le nombre iteration pour une journee
 
@@ -78,7 +81,6 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], p
 
         # Enregistre seulement les positions une fois par jour
         if i % Nb_iterations_enregistrement == 0 and i != 0:
-            print(i)
             projectile.ajouter_etat(new_pos, new_vit)
 
         pos, vit = new_pos, new_vit

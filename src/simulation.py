@@ -29,13 +29,14 @@ class Simulation:
                     t_max = temps_mort
         return t_max + padt
 
-    def recalculer(self):
+    def calculer(self, t):
+        #prendre en compte le temps apparition!!!
         for projectile in self.projectiles:
             if projectile.actif:
-                projectile.reinitialiser()  # Efface l'ancien historique avant de recalculer
+            #    projectile.reinitialiser()  # Efface l'ancien historique avant de recalculer
                 try:
-                    projectile.cible = calculer_trajectoire(projectile, self.astres, self.dt,
-                                                            projectile.temps_apparition + projectile.duree_vie)
+                    projectile.cible = calculer_trajectoire(projectile, self.astres, t, self.dt,
+                                                            int(projectile.temps_apparition + projectile.duree_vie))
                     if projectile.cible is not None:
                         projectile.etat = "collision"
                 except TempsMaximumAtteinte:
