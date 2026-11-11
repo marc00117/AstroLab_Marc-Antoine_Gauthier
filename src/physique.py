@@ -7,14 +7,16 @@ import numpy as np
 DISTANCE_MAX_AJOUTER = 2  # Distance en UA ajoutées pour les bornes maximales du projectile pour le considérer comme 'hors du système'
 
 
-def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], dt: float = 0.1, temps_maximum: int = 3653) -> AstreFixe:
+def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], prochain_t: int, dt: float = 0.1, temps_maximum: int = 3653) -> AstreFixe:
+    
     """_Crée la trajectoire du projectile en calculant sa position et sa vitesse sous les gravités des astres du système.
-        Les états calculés sont enregistrés dans l'historique du projectile.
-        Retourne l'astre fixe toucher ou Souleve un Exception selon ce qui ce passe à la place_
+    Les états calculés jusqu'au prochain temps sont enregistrés dans l'historique du projectile, s'il nest pas en se moment dans historique.
+    Retourne l'astre fixe toucher ou Souleve un Exception selon ce qui ce passe à la place_
 
     Args:
         projectile (Projectile): _Projectille utiliser pour la trajectoire_
         liste_astre (list[AstreFixe]): _Système des astres fixes dans une liste_
+        prochain_t (int) : _Prochain temps qui viens_
         dt (float, optional): _pas de temps entre les positions (en jour)_. Initialiser à 0.1 (recommandé pour la rapidité) si plus précis et un peux moins rapide -> 0.01.
         temps_maximum (int, optional): _nombre de position calculée maximum_. Initialisé à 3653 jours (10 ans).
 
@@ -22,7 +24,7 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], d
         HorsSystemeError: _si le projectile est hors du système._
         TempsMaximumAtteinte: _si le nombre de temps maximum a été atteint._
 
-    Returns:
+    Returns:historique
         AstreFixe: _retourne l'astre fixe seulement s'il a eu contacte avec un astre fixe_
     """
 
@@ -33,45 +35,56 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], d
         raise ValueError(
             "Physique : Il faut que toutes les astres dans liste_astre soit des AstreFixe."
         )
-    if not (isinstance(dt, (int, float)) and isinstance(temps_maximum, (int, float))):
-        raise ValueError("Physique : dt et temps_maximum doivent être des nombres.")
-    if dt < 0 or temps_maximum < 0:
-        raise ValueError("Physique : dt et temps_maximum doivent être positives.")
+    if not (isinstance(prochain_t, (int)) and isinstance(temps_maximum, int)):
+        raise ValueError("Physique : prochain_t et temps_maximum doivent être des entiers.")
+    if not isinstance(dt, (int, float)):
+        raise ValueError("Physique : dt doit être un nombre.")
+    if prochain_t < 0 or dt < 0 or temps_maximum < 0:
+        raise ValueError("Physique : prochain_t, dt et temps_maximum doivent être positives.")
+    
+    historique = projectile.historique
+    
+    if len(historique) > prochain_t: # verifi si la trajectoire au temps prochain_t est deja calculee 
+        return
 
-    Nb_iterations_enregistrement = int(1 / dt)
+    Nb_iterations_enregistrement = int(1 / dt) # calcule qui determine le nombre iteration pour une journee
 
     # détermine la longueur maximale pour arrêter la création de la liste
     astre_loin = max(liste_astre, key=lambda astre: astre.distance)
     distance_max = astre_loin.distance + DISTANCE_MAX_AJOUTER
 
-    # créer une liste de position que le projectile a faite
-    pos = projectile.pos0
-    vit = projectile.vit0
-    t = projectile.temps_apparition  # en jour : les astres partent de leur position au lancement
-    nombre_diteration_max = int(temps_maximum / dt)
+    etat_au_temps = historique[-1]
+    
+    # Inisialise les variables utilisers
+    pos, vit = np.array([float(etat_au_temps[0]), float(etat_au_temps[1])]), np.array([float(etat_au_temps[2]), float(etat_au_temps[3])])    
+    t = projectile.temps_apparition + len(historique) - 1   # en jour : les astres partent de leur position au lancement
+    nombre_diteration_max = int(temps_maximum / dt) # nombre ditteration que la boucle peux faire pour le programme
 
-    for i in range(nombre_diteration_max):
+    for i in range(int(len(historique)/dt), int((prochain_t + 1)/dt)):#'''1 = buffer pour que ca marche''' 
+        
         # Enregistre les coordonnées des astres ici, ce qui nous évite de les chercher constamment.
         astres_positions = [(astre, astre.position(t)) for astre in liste_astre]
 
         new_pos, new_vit = prochaine_pos_vit(pos, astres_positions, dt, vit)
         contacte, new_pos = est_en_contacte(pos, new_pos, projectile, astres_positions)
-
+        
         if contacte is not None: # s'il y a un contacte
             projectile.ajouter_etat(new_pos, new_vit)  # ajoute la dernière position du projectile (sur l’astre)
             return contacte
-
         if new_pos[0] ** 2 + new_pos[1] ** 2 > distance_max**2:
             raise HorsSystemeError("Le projectile est hors du système.")
+        if nombre_diteration_max < i: 
+            raise TempsMaximumAtteinte("Le nombre de temps maximum a été atteint.")
 
         # Enregistre seulement les positions une fois par jour
         if i % Nb_iterations_enregistrement == 0 and i != 0:
+            print(i)
             projectile.ajouter_etat(new_pos, new_vit)
 
         pos, vit = new_pos, new_vit
         t += dt
-
-    raise TempsMaximumAtteinte("Le nombre de temps maximum a été atteint.")
+    return None
+    
 
 
 def acceleration( pos: list[float], astres_positions: list[tuple[AstreFixe, tuple[float, float]]]) -> np.ndarray:
@@ -275,9 +288,11 @@ if __name__ == "__main__":
         impact = calculer_trajectoire(
             projectile,
             [soleil, terre],
+            200,
         )
     except (TempsMaximumAtteinte, HorsSystemeError) as e:
         print("O NON :( : ", e, "\n")
+
 
     if impact is None:
         print("aucun impact")
